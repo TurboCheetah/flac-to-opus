@@ -18,6 +18,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from rich.table import Table
 
 
 class TranscoderTool:
@@ -44,6 +45,7 @@ class TranscoderTool:
 
         # Results tracking
         self.results = {"success": 0, "failed": 0, "skipped": 0, "dry-run": 0}
+        self.non_flac_results = {"copied": 0, "skipped": 0, "dry-run": 0}
 
     def setup_logging(self):
         """Set up logging with main and error logs, plus colorized console output via Rich."""
@@ -100,6 +102,12 @@ class TranscoderTool:
     def find_flac_files(self):
         """Find all FLAC files recursively in source_dir."""
         return list(self.source_dir.rglob("*.flac"))
+
+    def find_non_flac_files(self):
+        """Find all non-FLAC files recursively in source_dir."""
+        # We'll return all files that are not flac and not directories
+        all_files = list(self.source_dir.rglob("*"))
+        return [f for f in all_files if f.is_file() and f.suffix.lower() != ".flac"]
 
     def transcode_file(self, flac_path: Path):
         """Transcode a single FLAC file to OPUS."""
@@ -159,6 +167,62 @@ class TranscoderTool:
         self.logger.info(f"Conversion Duration: {duration:.2f} seconds.")
         return "success"
 
+    def copy_non_flac_file(self, src_file: Path):
+        """Copy a single non-FLAC file to the destination, preserving directory structure."""
+        rel_path = src_file.relative_to(self.source_dir)
+        dest_file = self.dest_dir / rel_path
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Check modification times
+        if dest_file.exists() and src_file.stat().st_mtime <= dest_file.stat().st_mtime:
+            self.logger.info(
+                f"Skipping copying '{src_file}' as '{dest_file}' is up-to-date."
+            )
+            return "skipped"
+
+        if self.dry_run:
+            self.logger.info(f"Dry-run: Would copy '{src_file}' to '{dest_file}'.")
+            return "dry-run"
+
+        try:
+            shutil.copy2(src_file, dest_file)
+        except Exception as e:
+            self.logger.error(f"Unexpected error copying '{src_file}': {e}")
+            return "failed"
+
+        self.logger.info(f"Copied '{src_file}' to '{dest_file}'.")
+        return "copied"
+
+    def copy_non_flac_files(self):
+        """Copy all non-FLAC files from source to dest, respecting structure and modification times."""
+        non_flac_files = self.find_non_flac_files()
+        total_non_flac = len(non_flac_files)
+
+        if total_non_flac == 0:
+            self.logger.info("No non-FLAC files found to copy.")
+            return
+
+        self.logger.info(f"Found {total_non_flac} non-FLAC files to copy.")
+
+        # We can use a progress bar for this as well
+        with Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.0f}%",
+            "•",
+            TimeElapsedColumn(),
+            "•",
+            TimeRemainingColumn(),
+            console=self.console,
+            transient=True,
+        ) as progress:
+            task_id = progress.add_task("Copying non-FLAC files", total=total_non_flac)
+
+            for src_file in non_flac_files:
+                result = self.copy_non_flac_file(src_file)
+                self.non_flac_results[result] = self.non_flac_results.get(result, 0) + 1
+                progress.update(task_id, advance=1)
+
     def summarize(self, total: int):
         """Print the summary using rich."""
         table_data = [
@@ -171,8 +235,6 @@ class TranscoderTool:
             ("Error log", str(self.error_log_file)),
         ]
 
-        from rich.table import Table
-
         summary_table = Table(
             title="Transcoding Summary", show_header=True, header_style="bold magenta"
         )
@@ -183,6 +245,26 @@ class TranscoderTool:
             summary_table.add_row(metric, value)
 
         self.console.print(summary_table)
+
+        # Also print summary of non-FLAC file copying
+        non_flac_table_data = [
+            ("Copied", str(self.non_flac_results.get("copied", 0))),
+            ("Skipped (up-to-date)", str(self.non_flac_results.get("skipped", 0))),
+            ("Dry-run", str(self.non_flac_results.get("dry-run", 0))),
+        ]
+
+        non_flac_table = Table(
+            title="Non-FLAC Files Copy Summary",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        non_flac_table.add_column("Metric", style="dim", no_wrap=True)
+        non_flac_table.add_column("Value", style="bold yellow")
+
+        for metric, value in non_flac_table_data:
+            non_flac_table.add_row(metric, value)
+
+        self.console.print(non_flac_table)
 
     def run(self):
         """Run the entire transcoding process."""
@@ -216,6 +298,8 @@ class TranscoderTool:
         total_files = len(flac_files)
         if total_files == 0:
             self.logger.info(f"No FLAC files found in '{self.source_dir}'.")
+            # Even if no FLAC files, we still copy non-FLAC files
+            self.copy_non_flac_files()
             self.summarize(total_files)
             sys.exit(0)
 
@@ -252,6 +336,9 @@ class TranscoderTool:
                         result = future.result()
                         self.results[result] += 1
                         progress.update(task_id, advance=1)
+
+        # After transcoding FLAC files, copy all non-FLAC files
+        self.copy_non_flac_files()
 
         self.summarize(total_files)
         self.logger.info(f"Transcoding ended at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -307,3 +394,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
