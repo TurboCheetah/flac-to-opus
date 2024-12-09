@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -46,6 +47,13 @@ class TranscoderTool:
         # Results tracking
         self.results = {"success": 0, "failed": 0, "skipped": 0, "dry-run": 0}
         self.non_flac_results = {"copied": 0, "skipped": 0, "dry-run": 0}
+
+        # Tracking active subprocesses
+        self.active_subprocesses = []
+        self.subprocess_lock = threading.Lock()
+
+        # Flag to indicate interruption
+        self.interrupted = False
 
     def setup_logging(self):
         """Set up logging with main and error logs, plus colorized console output via Rich."""
@@ -105,12 +113,14 @@ class TranscoderTool:
 
     def find_non_flac_files(self):
         """Find all non-FLAC files recursively in source_dir."""
-        # We'll return all files that are not flac and not directories
         all_files = list(self.source_dir.rglob("*"))
         return [f for f in all_files if f.is_file() and f.suffix.lower() != ".flac"]
 
     def transcode_file(self, flac_path: Path):
         """Transcode a single FLAC file to OPUS."""
+        if self.interrupted:
+            return "skipped"
+
         rel_path = flac_path.relative_to(self.source_dir)
         opus_rel_path = rel_path.with_suffix(".opus")
         opus_full_path = self.dest_dir / opus_rel_path
@@ -140,23 +150,39 @@ class TranscoderTool:
             str(flac_path),
             str(opus_full_path),
         ]
+
+        with self.subprocess_lock:
+            try:
+                p = subprocess.Popen(
+                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                self.active_subprocesses.append(p)
+            except Exception as e:
+                self.logger.error(f"Failed to start subprocess for '{flac_path}': {e}")
+                return "failed"
+
         try:
-            subprocess.run(
-                cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-        except subprocess.CalledProcessError as e:
-            self.logger.error(
-                f"Failed to transcode '{flac_path}' to '{opus_full_path}'. Error: {e}"
-            )
-            return "failed"
+            p.wait()
+            if p.returncode != 0:
+                self.logger.error(
+                    f"Failed to transcode '{flac_path}' to '{opus_full_path}'. opusenc exited with code {p.returncode}."
+                )
+                return "failed"
         except Exception as e:
             self.logger.error(f"Unexpected error transcoding '{flac_path}': {e}")
             return "failed"
+        finally:
+            with self.subprocess_lock:
+                self.active_subprocesses.remove(p)
 
         end_time = time.time()
         duration = end_time - start_time
-        src_size = flac_path.stat().st_size
-        dest_size = opus_full_path.stat().st_size
+        try:
+            src_size = flac_path.stat().st_size
+            dest_size = opus_full_path.stat().st_size
+        except FileNotFoundError:
+            src_size = "N/A"
+            dest_size = "N/A"
 
         self.logger.info(
             f"Successfully transcoded '{flac_path}' to '{opus_full_path}'."
@@ -168,7 +194,7 @@ class TranscoderTool:
         return "success"
 
     def copy_non_flac_file(self, src_file: Path):
-        """Copy a single non-FLAC file to the destination, preserving directory structure."""
+        """Copy a single non-FLAC file to the destination."""
         rel_path = src_file.relative_to(self.source_dir)
         dest_file = self.dest_dir / rel_path
         dest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -194,7 +220,7 @@ class TranscoderTool:
         return "copied"
 
     def copy_non_flac_files(self):
-        """Copy all non-FLAC files from source to dest, respecting structure and modification times."""
+        """Copy all non-FLAC files from source to dest."""
         non_flac_files = self.find_non_flac_files()
         total_non_flac = len(non_flac_files)
 
@@ -204,7 +230,6 @@ class TranscoderTool:
 
         self.logger.info(f"Found {total_non_flac} non-FLAC files to copy.")
 
-        # We can use a progress bar for this as well
         with Progress(
             TextColumn("[bold blue]{task.description}"),
             BarColumn(),
@@ -219,6 +244,11 @@ class TranscoderTool:
             task_id = progress.add_task("Copying non-FLAC files", total=total_non_flac)
 
             for src_file in non_flac_files:
+                if self.interrupted:
+                    self.logger.info(
+                        "Interruption detected. Skipping remaining non-FLAC files."
+                    )
+                    break
                 result = self.copy_non_flac_file(src_file)
                 self.non_flac_results[result] = self.non_flac_results.get(result, 0) + 1
                 progress.update(task_id, advance=1)
@@ -251,6 +281,7 @@ class TranscoderTool:
             ("Copied", str(self.non_flac_results.get("copied", 0))),
             ("Skipped (up-to-date)", str(self.non_flac_results.get("skipped", 0))),
             ("Dry-run", str(self.non_flac_results.get("dry-run", 0))),
+            ("Failed", str(self.non_flac_results.get("failed", 0))),
         ]
 
         non_flac_table = Table(
@@ -301,7 +332,7 @@ class TranscoderTool:
             # Even if no FLAC files, we still copy non-FLAC files
             self.copy_non_flac_files()
             self.summarize(total_files)
-            sys.exit(0)
+            return
 
         self.logger.info(f"Total FLAC files found: {total_files}")
 
@@ -322,20 +353,45 @@ class TranscoderTool:
             task_id = progress.add_task("Transcoding", total=total_files)
 
             if jobs == 1:
-                for flac in flac_files:
-                    result = transcode_wrapper(flac)
-                    self.results[result] += 1
-                    progress.update(task_id, advance=1)
-            else:
-                with ThreadPoolExecutor(max_workers=jobs) as executor:
-                    futures = {
-                        executor.submit(transcode_wrapper, flac): flac
-                        for flac in flac_files
-                    }
-                    for future in as_completed(futures):
-                        result = future.result()
+                # Single-threaded
+                try:
+                    for flac in flac_files:
+                        result = transcode_wrapper(flac)
                         self.results[result] += 1
                         progress.update(task_id, advance=1)
+                except KeyboardInterrupt:
+                    self.logger.error(
+                        "Interrupted by user (Ctrl-C). Terminating subprocesses..."
+                    )
+                    self.interrupted = True
+                    self.terminate_active_subprocesses()
+                    self.logger.error("All subprocesses terminated. Exiting.")
+                    sys.exit(1)
+            else:
+                # Multi-threaded
+                futures = {}
+                try:
+                    with ThreadPoolExecutor(max_workers=jobs) as executor:
+                        futures = {
+                            executor.submit(transcode_wrapper, flac): flac
+                            for flac in flac_files
+                        }
+                        for future in as_completed(futures):
+                            try:
+                                result = future.result()
+                                self.results[result] += 1
+                            except Exception as e:
+                                self.logger.error(f"Error processing file: {e}")
+                                self.results["failed"] += 1
+                            progress.update(task_id, advance=1)
+                except KeyboardInterrupt:
+                    self.logger.error(
+                        "Interrupted by user (Ctrl-C). Terminating subprocesses..."
+                    )
+                    self.interrupted = True
+                    self.terminate_active_subprocesses()
+                    self.logger.error("All subprocesses terminated. Exiting.")
+                    sys.exit(1)
 
         # After transcoding FLAC files, copy all non-FLAC files
         self.copy_non_flac_files()
@@ -343,6 +399,30 @@ class TranscoderTool:
         self.summarize(total_files)
         self.logger.info(f"Transcoding ended at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         self.logger.info("All done!")
+
+    def terminate_active_subprocesses(self):
+        """Terminate all active subprocesses."""
+        with self.subprocess_lock:
+            for p in self.active_subprocesses:
+                if p.poll() is None:  # Process is still running
+                    try:
+                        p.terminate()
+                        self.logger.info(f"Terminated subprocess with PID {p.pid}.")
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to terminate subprocess {p.pid}: {e}"
+                        )
+            # Optionally, wait for them to terminate
+            for p in self.active_subprocesses:
+                if p.poll() is None:
+                    try:
+                        p.wait(timeout=5)
+                        self.logger.info(f"Subprocess with PID {p.pid} has exited.")
+                    except subprocess.TimeoutExpired:
+                        self.logger.warning(
+                            f"Subprocess with PID {p.pid} did not terminate in time. Killing it."
+                        )
+                        p.kill()
 
 
 def main():
@@ -389,7 +469,13 @@ def main():
         verbose=args.verbose,
         jobs=args.jobs,
     )
-    tool.run()
+    try:
+        tool.run()
+    except KeyboardInterrupt:
+        # Handle ctrl-c gracefully
+        tool.logger.error("Interrupted by user (Ctrl-C). Exiting immediately.")
+        tool.terminate_active_subprocesses()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

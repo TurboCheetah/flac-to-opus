@@ -1,6 +1,6 @@
 [project]
 name = "flac-to-opus"
-version = "1.0.0"
+version = "1.0.1"
 description = "Batch transcode FLAC to OPUS"
 authors = [{ name = "Turbo", email = "dev@turbo.ooo" }]
 license = { file = "LICENSE" }
