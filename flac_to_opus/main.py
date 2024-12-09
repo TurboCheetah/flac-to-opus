@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import math
 import os
 import shutil
 import subprocess
@@ -47,6 +48,11 @@ class TranscoderTool:
         # Results tracking
         self.results = {"success": 0, "failed": 0, "skipped": 0, "dry-run": 0}
         self.non_flac_results = {"copied": 0, "skipped": 0, "dry-run": 0}
+
+        # Tracking total sizes
+        self.total_source_size = 0
+        self.total_dest_size = 0
+        self.size_lock = threading.Lock()
 
         # Tracking active subprocesses
         self.active_subprocesses = []
@@ -116,6 +122,16 @@ class TranscoderTool:
         all_files = list(self.source_dir.rglob("*"))
         return [f for f in all_files if f.is_file() and f.suffix.lower() != ".flac"]
 
+    def format_size(self, size_bytes):
+        """Convert bytes to a human-readable format."""
+        if size_bytes == 0:
+            return "0B"
+        size_name = ("B", "KB", "MB", "GB", "TB")
+        i = int(math.floor(math.log(size_bytes, 1024)))
+        p = math.pow(1024, i)
+        s = round(size_bytes / p, 2)
+        return f"{s} {size_name[i]}"
+
     def transcode_file(self, flac_path: Path):
         """Transcode a single FLAC file to OPUS."""
         if self.interrupted:
@@ -181,16 +197,22 @@ class TranscoderTool:
             src_size = flac_path.stat().st_size
             dest_size = opus_full_path.stat().st_size
         except FileNotFoundError:
-            src_size = "N/A"
-            dest_size = "N/A"
+            src_size = 0
+            dest_size = 0
 
         self.logger.info(
             f"Successfully transcoded '{flac_path}' to '{opus_full_path}'."
         )
         self.logger.info(
-            f"File Size: Source={src_size} bytes, Destination={dest_size} bytes."
+            f"File Size: Source={self.format_size(src_size)}, Destination={self.format_size(dest_size)}."
         )
         self.logger.info(f"Conversion Duration: {duration:.2f} seconds.")
+
+        # Update total sizes
+        with self.size_lock:
+            self.total_source_size += src_size
+            self.total_dest_size += dest_size
+
         return "success"
 
     def copy_non_flac_file(self, src_file: Path):
@@ -255,7 +277,7 @@ class TranscoderTool:
 
     def summarize(self, total: int):
         """Print the summary using rich."""
-        table_data = [
+        summary_table_data = [
             ("Total FLAC files found", str(total)),
             ("Successfully transcoded", str(self.results["success"])),
             ("Failed to transcode", str(self.results["failed"])),
@@ -271,7 +293,20 @@ class TranscoderTool:
         summary_table.add_column("Metric", style="dim", no_wrap=True)
         summary_table.add_column("Value", style="bold yellow")
 
-        for metric, value in table_data:
+        for metric, value in summary_table_data:
+            summary_table.add_row(metric, value)
+
+        # Add space summary
+        space_summary = [
+            ("Total Source Size", self.format_size(self.total_source_size)),
+            ("Total Destination Size", self.format_size(self.total_dest_size)),
+            (
+                "Space Saved",
+                self.format_size(self.total_source_size - self.total_dest_size),
+            ),
+        ]
+
+        for metric, value in space_summary:
             summary_table.add_row(metric, value)
 
         self.console.print(summary_table)
@@ -472,7 +507,7 @@ def main():
     try:
         tool.run()
     except KeyboardInterrupt:
-        # Handle ctrl-c gracefully
+        # Handle ctrl-c gracefully if it bubbles up here
         tool.logger.error("Interrupted by user (Ctrl-C). Exiting immediately.")
         tool.terminate_active_subprocesses()
         sys.exit(1)
