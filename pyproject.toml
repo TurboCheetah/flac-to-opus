@@ -1,0 +1,14 @@
+[project]
+name = "flac-to-opus"
+version = "1.0.0"
+description = "Batch transcode FLAC to OPUS"
+authors = [{ name = "Turbo", email = "dev@turbo.ooo" }]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "rich>=13.9.4",
+]
+
+[project.scripts]
+flac-to-opus = "flac_to_opus.main:main"
