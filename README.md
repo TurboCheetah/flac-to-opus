@@ -2,6 +2,8 @@
 
 **Convert FLAC audio files to opus**
 
+[![demo](https://asciinema.org/a/2xCSHSn2I1XkT7KmOFzFts2S2.svg)](https://asciinema.org/a/2xCSHSn2I1XkT7KmOFzFts2S2)
+
 ---
 
 ## **Features**
