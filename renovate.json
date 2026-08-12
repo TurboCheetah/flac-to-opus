@@ -17,6 +17,18 @@
         "major"
       ],
       "automerge": false
+    },
+    {
+      "matchJsonata": [
+        "isVulnerabilityAlert = true"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true
     }
   ]
 }
