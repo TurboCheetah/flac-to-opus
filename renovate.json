@@ -9,7 +9,6 @@
     "addLabels": [
       "security"
     ],
-    "automerge": true,
     "vulnerabilityFixStrategy": "lowest"
   },
   "packageRules": [
@@ -21,7 +20,13 @@
     },
     {
       "matchJsonata": [
-        "$exists(vulnerabilityFixVersion)"
+        "isVulnerabilityAlert = true"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
       ],
       "addLabels": [
         "security"
