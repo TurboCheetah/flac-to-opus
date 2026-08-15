@@ -103,11 +103,15 @@ def main(
         jobs=jobs,
     )
     items = plan_items(settings)
+
+    def copy_file(src: Path, dest: Path) -> None:
+        shutil.copy2(src, dest)
+
     result = run_items(
         settings,
         items,
         encoder=OpusencEncoder(),
-        copy_file=shutil.copy2,
+        copy_file=copy_file,
     )
     total_flacs = sum(1 for item in items if item.kind == "transcode")
     summarize(Console(), result, total_flacs, log_file, error_log_file)

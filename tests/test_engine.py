@@ -63,7 +63,12 @@ class FakeEncoder:
         if self.ok:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(b"opus")
-        return EncodeResult(ok=self.ok, returncode=0 if self.ok else 2, stderr=self.stderr, duration_s=0.01)
+        return EncodeResult(
+            ok=self.ok,
+            returncode=0 if self.ok else 2,
+            stderr=self.stderr,
+            duration_s=0.01,
+        )
 
 
 def test_run_items_encodes_and_copies(tmp_path):
@@ -111,7 +116,12 @@ def test_run_items_skip_and_dry_run_do_not_call_encoder(tmp_path):
         PlannedItem("copy", cover, dest_dir / "cover.jpg", "dry-run"),
     ]
     encoder = FakeEncoder()
-    result = run_items(settings, items, encoder, copy_file=lambda s, d: (_ for _ in ()).throw(AssertionError("copy")))
+    result = run_items(
+        settings,
+        items,
+        encoder,
+        copy_file=lambda s, d: (_ for _ in ()).throw(AssertionError("copy")),
+    )
     assert encoder.calls == []
     assert result.transcode_skipped == 1
     assert result.copy_dry_run == 1
@@ -126,7 +136,12 @@ def test_run_items_counts_encoder_failure(tmp_path):
     flac.write_bytes(b"f")
     settings = Settings(src_dir, dest_dir, "192", False, False, 1)
     items = [PlannedItem("transcode", flac, dest_dir / "t.opus", "run")]
-    result = run_items(settings, items, FakeEncoder(ok=False, stderr="nope"), copy_file=lambda s, d: None)
+    result = run_items(
+        settings,
+        items,
+        FakeEncoder(ok=False, stderr="nope"),
+        copy_file=lambda s, d: None,
+    )
     assert result.transcode_failed == 1
     assert result.failed == 1
 

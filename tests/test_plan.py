@@ -28,7 +28,9 @@ def test_parse_bitrate_accepts_common_forms(raw, expected):
     assert parse_bitrate(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["", "k", "abc", "192kb", "0", "5", "513", "-1", "192 k"])
+@pytest.mark.parametrize(
+    "raw", ["", "k", "abc", "192kb", "0", "5", "513", "-1", "192 k"]
+)
 def test_parse_bitrate_rejects_bad_values(raw):
     with pytest.raises(ValueError):
         parse_bitrate(raw)

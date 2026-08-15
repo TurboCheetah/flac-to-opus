@@ -89,8 +89,12 @@ def plan_items(settings: Settings) -> list[PlannedItem]:
     items: list[PlannedItem] = []
     for src in flacs:
         dest = dest_for(settings.source_dir, settings.dest_dir, src, "transcode")
-        items.append(PlannedItem("transcode", src, dest, _action(src, dest, settings.dry_run)))
+        items.append(
+            PlannedItem("transcode", src, dest, _action(src, dest, settings.dry_run))
+        )
     for src in sidecars:
         dest = dest_for(settings.source_dir, settings.dest_dir, src, "copy")
-        items.append(PlannedItem("copy", src, dest, _action(src, dest, settings.dry_run)))
+        items.append(
+            PlannedItem("copy", src, dest, _action(src, dest, settings.dry_run))
+        )
     return items
