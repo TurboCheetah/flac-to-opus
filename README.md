@@ -1,91 +1,73 @@
 # flac-to-opus
 
-**Convert FLAC audio files to opus**
+`flac-to-opus` batch-converts FLAC audio to Opus while preserving the source
+layout and copying non-FLAC sidecar files.
 
-[![demo](https://asciinema.org/a/2xCSHSn2I1XkT7KmOFzFts2S2.svg)](https://asciinema.org/a/2xCSHSn2I1XkT7KmOFzFts2S2)
+## Requirements
 
----
+- Python 3.12+
+- [`opusenc`](https://github.com/xiph/opus-tools), provided by the
+  [`opus-tools`](https://github.com/xiph/opus-tools) package and available on
+  `PATH`
 
-## **Features**
+## Install
 
-- **Batch Transcoding:** Convert multiple FLAC files at once, preserving the
-  original directory structure.
-- **Custom Bitrate:** Choose a desired bitrate (e.g., 192k, 256k) to balance
-  between audio quality and file size.
-- **Parallel Processing:** Speed up the conversion process by utilizing multiple
-  CPU cores.
-- **Dry-Run Mode:** Preview which files will be transcoded without making any
-  changes.
-- **Detailed Logging:** Keep track of all operations with comprehensive log
-  files.
-- **Progress Indicators:** Stay informed with real-time progress bars during the
-  transcoding process.
-- **Robust File Handling:** Supports filenames with spaces, special characters,
-  and more.
-
----
-
-## Installation
-
-Install using [uv](https://docs.astral.sh/uv/):
+Install the command as a uv tool:
 
 ```bash
 uv tool install .
 ```
 
-## **Usage**
+## Usage
 
-### **Basic Conversion**
-
-Convert all FLAC files from a source directory to opus in the destination
-directory with default settings:
+Convert a source tree into a destination tree using the default 192k bitrate:
 
 ```bash
 flac-to-opus /path/to/source /path/to/destination
 ```
 
-### **Specify Bitrate**
-
-Choose a custom bitrate (e.g., 256k) for the OPUS files:
+Choose a bitrate, run four parallel encode jobs, enable verbose output, or
+preview the work without performing it:
 
 ```bash
 flac-to-opus -b 256k /path/to/source /path/to/destination
-```
-
-### **Set Number of Parallel Jobs**
-
-Optimize conversion speed by specifying the number of parallel jobs (e.g., 4):
-
-```bash
 flac-to-opus -j 4 /path/to/source /path/to/destination
-```
-
-_If the `-j` option is omitted, the tool will automatically detect and use all
-available CPU cores._
-
-### **Enable Verbose Output**
-
-Get real-time feedback in the terminal during the conversion process:
-
-```bash
 flac-to-opus -v /path/to/source /path/to/destination
-```
-
-### **Perform a Dry-Run**
-
-See which files would be transcoded without actually performing the conversion:
-
-```bash
 flac-to-opus -d /path/to/source /path/to/destination
 ```
 
----
+`-b` accepts 6–512 kbit/s and defaults to 192k. If `-j` is omitted, the tool
+auto-detects the CPU count. FLAC discovery is case-insensitive (`.flac`,
+`.FLAC`, and so on). Each destination mirrors the source file's relative path;
+FLAC files get an `.opus` suffix and sidecars are copied unchanged.
 
-## **Dependencies**
+An up-to-date destination is skipped by modification time. Dry-run mode does
+not perform encoding or copying. Each run creates a destination log and error
+log file. Failed encodes return exit status 1; missing or invalid prerequisites
+(such as a missing source directory, invalid bitrate, or unavailable
+`opusenc`) return exit status 2.
 
-- **Python 3.x**
-- **[opusenc](https://github.com/xiph/opus-tools) :** Part of the `opus-tools`
-  package, for transcoding to opus
-- **[rich](https://github.com/Textualize/rich) :** Nice logging and progress bar
+## Architecture
 
----
+- `cli.py` validates arguments and prerequisites, then orchestrates a run.
+- `plan.py` performs pure, case-insensitive discovery and planning.
+- `engine.py` executes planned encodes and copies through injected functions.
+- `opusenc.py` adapts the external `opusenc` command.
+- `display.py` owns file logging and Rich summary output.
+
+## Development
+
+```bash
+uv sync --group dev
+uv run pytest -q
+uv run ruff check .
+uv run ruff format --check .
+uv run ty check src
+uv run pre-commit run --all-files
+```
+
+Installing the hooks is optional:
+
+```bash
+uv run pre-commit install
+```
