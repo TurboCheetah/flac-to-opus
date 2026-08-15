@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-flac-to-opus = "flac_to_opus.main:main"
+flac-to-opus = "flac_to_opus.cli:main"
 
 [dependency-groups]
 dev = [
