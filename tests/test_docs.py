@@ -21,6 +21,10 @@ def test_documentation_artifacts_describe_current_contracts() -> None:
         "-v",
         "Python 3.12+",
         "192k",
+        "Successful runs return exit status 0",
+        "Failed encodes or copies return",
+        "exit status 1",
+        "return exit status 2",
     ):
         assert marker in readme
 

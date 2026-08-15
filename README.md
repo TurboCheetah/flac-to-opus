@@ -43,9 +43,9 @@ FLAC files get an `.opus` suffix and sidecars are copied unchanged.
 
 An up-to-date destination is skipped by modification time. Dry-run mode does
 not perform encoding or copying. Each run creates a destination log and error
-log file. Failed encodes return exit status 1; missing or invalid prerequisites
-(such as a missing source directory, invalid bitrate, or unavailable
-`opusenc`) return exit status 2.
+log file. Successful runs return exit status 0. Failed encodes or copies return
+exit status 1. Missing or invalid prerequisites (such as a missing source
+directory, invalid bitrate, or unavailable `opusenc`) return exit status 2.
 
 ## Architecture
 
