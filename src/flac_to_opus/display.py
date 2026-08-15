@@ -12,17 +12,17 @@ from rich.table import Table
 from flac_to_opus.engine import RunResult
 
 
-def format_size(size_bytes):
+def format_size(size_bytes: int) -> str:
     if size_bytes == 0:
         return "0B"
     size_name = ("B", "KB", "MB", "GB", "TB")
-    i = int(math.floor(math.log(size_bytes, 1024)))
+    i = math.floor(math.log(size_bytes, 1024))
     p = math.pow(1024, i)
     s = round(size_bytes / p, 2)
     return f"{s} {size_name[i]}"
 
 
-def setup_logging(dest_dir, verbose):
+def setup_logging(dest_dir: Path, verbose: bool) -> tuple[logging.Logger, Path, Path]:
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,7 +61,13 @@ def setup_logging(dest_dir, verbose):
     return logger, log_file, error_log_file
 
 
-def summarize(console, result, total_flacs, log_file, error_log_file):
+def summarize(
+    console: Console,
+    result: RunResult,
+    total_flacs: int,
+    log_file: Path,
+    error_log_file: Path,
+) -> None:
     summary_table_data = [
         ("Total FLAC files found", str(total_flacs)),
         ("Successfully transcoded", str(result.transcode_ok)),

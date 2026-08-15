@@ -29,7 +29,8 @@ def test_setup_logging_creates_files_and_records_error(tmp_path):
 
 
 def test_summarize_emits_table_titles():
-    console = Console(file=StringIO(), force_terminal=False, width=80)
+    buffer = StringIO()
+    console = Console(file=buffer, force_terminal=False, width=80)
     result = RunResult(
         transcode_ok=1,
         transcode_failed=0,
@@ -49,6 +50,6 @@ def test_summarize_emits_table_titles():
         log_file=Path("/tmp/main.log"),
         error_log_file=Path("/tmp/error.log"),
     )
-    output = console.file.getvalue()
+    output = buffer.getvalue()
     assert "Transcoding Summary" in output
     assert "Non-FLAC Files Copy Summary" in output
