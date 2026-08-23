@@ -173,6 +173,7 @@ def test_run_items_counts_encoder_failure(tmp_path):
     )
     assert result.transcode_failed == 1
     assert result.failed == 1
+    assert result.errors == [f"encode failed for {flac}: nope"]
 
 
 def test_run_items_jobs_two_records_both_transcodes(tmp_path):
@@ -209,3 +210,4 @@ def test_run_items_copy_exception_counts_failure(tmp_path):
     result = run_items(settings, items, FakeEncoder(), copy_file=copy_file)
     assert result.copy_failed == 1
     assert result.failed == 1
+    assert result.errors == [f"copy failed for {cover}: nope"]

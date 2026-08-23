@@ -93,7 +93,7 @@ def main(
         return 2
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    _logger, log_file, error_log_file = setup_logging(dest_dir, args.verbose)
+    logger, log_file, error_log_file = setup_logging(dest_dir, args.verbose)
     settings = Settings(
         source_dir=source_dir,
         dest_dir=dest_dir,
@@ -102,7 +102,11 @@ def main(
         verbose=args.verbose,
         jobs=jobs,
     )
-    items = plan_items(settings)
+    try:
+        items = plan_items(settings)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        return 1
 
     def copy_file(src: Path, dest: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -114,6 +118,8 @@ def main(
         encoder=OpusencEncoder(),
         copy_file=copy_file,
     )
+    for error in result.errors:
+        logger.error("%s", error)
     total_flacs = sum(1 for item in items if item.kind == "transcode")
     summarize(Console(), result, total_flacs, log_file, error_log_file)
     return 1 if result.failed or result.interrupted else 0

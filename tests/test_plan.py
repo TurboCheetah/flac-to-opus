@@ -171,3 +171,13 @@ def test_plan_items_gives_transcode_destination_exclusive_ownership(tmp_path):
     assert [(item.kind, item.src.name, item.dest.name) for item in items] == [
         ("transcode", "track.flac", "track.opus")
     ]
+
+
+def test_plan_items_rejects_non_file_destination_conflicts(tmp_path):
+    settings = _settings(tmp_path)
+    (settings.source_dir / "cover.jpg").write_bytes(b"cover")
+    conflict = settings.dest_dir / "cover.jpg"
+    conflict.mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="destination path exists and is not a file"):
+        plan_items(settings)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from typing import Protocol
@@ -35,6 +35,7 @@ class RunResult:
     source_bytes: int = 0
     dest_bytes: int = 0
     interrupted: bool = False
+    errors: list[str] = field(default_factory=list)
 
     @property
     def failed(self) -> int:
@@ -77,12 +78,17 @@ def run_items(
                         pass
                 else:
                     result.transcode_failed += 1
+                    detail = (
+                        encoded.stderr.strip() or f"exit status {encoded.returncode}"
+                    )
+                    result.errors.append(f"encode failed for {item.src}: {detail}")
             return
         try:
             copy_file(item.src, item.dest)
-        except OSError:
+        except OSError as exc:
             with lock:
                 result.copy_failed += 1
+                result.errors.append(f"copy failed for {item.src}: {exc}")
             return
         with lock:
             result.copy_ok += 1

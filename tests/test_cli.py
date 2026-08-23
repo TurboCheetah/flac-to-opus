@@ -45,6 +45,24 @@ def test_failed_encode_exits_one(tmp_path, monkeypatch):
     monkeypatch.setattr(OpusencEncoder, "encode", fake_encode)
     rc = main([str(src), str(dest)], which=lambda n: "/bin/opusenc")
     assert rc == 1
+    error_logs = list(dest.glob("*.errors.log"))
+    assert len(error_logs) == 1
+    assert "boom" in error_logs[0].read_text()
+
+
+def test_destination_conflict_exits_one_and_logs_error(tmp_path):
+    src = tmp_path / "in"
+    dest = tmp_path / "out"
+    src.mkdir()
+    (src / "cover.jpg").write_bytes(b"cover")
+    (dest / "cover.jpg").mkdir(parents=True)
+
+    rc = main([str(src), str(dest)], which=lambda n: "/bin/opusenc")
+
+    assert rc == 1
+    error_logs = list(dest.glob("*.errors.log"))
+    assert len(error_logs) == 1
+    assert "destination path exists and is not a file" in error_logs[0].read_text()
 
 
 def test_nested_sidecar_copy_creates_destination_parent(tmp_path):

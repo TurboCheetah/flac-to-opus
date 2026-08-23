@@ -6,6 +6,7 @@ ROOT = Path(__file__).parents[1]
 def test_documentation_artifacts_describe_current_contracts() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    ci_workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
     for marker in (
         "uv tool install .",
@@ -49,3 +50,11 @@ def test_documentation_artifacts_describe_current_contracts() -> None:
             "progress bars",
         ):
             assert stale_marker not in source
+
+    for packaging_marker in (
+        "uv build",
+        "uv tool install .",
+        "UV_TOOL_BIN_DIR}/flac-to-opus",
+        "--help",
+    ):
+        assert packaging_marker in ci_workflow

@@ -85,12 +85,18 @@ def _action(src: Path, dest: Path, dry_run: bool) -> Action:
     return "run"
 
 
+def _reject_non_file_destination(dest: Path) -> None:
+    if dest.exists() and not dest.is_file():
+        raise ValueError(f"destination path exists and is not a file: {dest}")
+
+
 def plan_items(settings: Settings) -> list[PlannedItem]:
     flacs, sidecars = discover(settings.source_dir)
     items: list[PlannedItem] = []
     transcode_destinations: set[Path] = set()
     for src in flacs:
         dest = dest_for(settings.source_dir, settings.dest_dir, src, "transcode")
+        _reject_non_file_destination(dest)
         transcode_destinations.add(dest)
         items.append(
             PlannedItem("transcode", src, dest, _action(src, dest, settings.dry_run))
@@ -99,6 +105,7 @@ def plan_items(settings: Settings) -> list[PlannedItem]:
         dest = dest_for(settings.source_dir, settings.dest_dir, src, "copy")
         if dest in transcode_destinations:
             continue
+        _reject_non_file_destination(dest)
         items.append(
             PlannedItem("copy", src, dest, _action(src, dest, settings.dry_run))
         )
