@@ -15,6 +15,14 @@ def test_format_size_kibibyte():
     assert format_size(1024) == "1.0 KB"
 
 
+def test_format_size_clamps_to_largest_unit():
+    assert format_size(1024**5) == "1024.0 TB"
+
+
+def test_format_size_preserves_negative_sign():
+    assert format_size(-1024) == "-1.0 KB"
+
+
 def test_setup_logging_creates_files_and_records_error(tmp_path):
     logger, log_file, error_log_file = setup_logging(tmp_path, verbose=False)
     assert log_file.exists()

@@ -16,9 +16,11 @@ def format_size(size_bytes: int) -> str:
     if size_bytes == 0:
         return "0B"
     size_name = ("B", "KB", "MB", "GB", "TB")
-    i = math.floor(math.log(size_bytes, 1024))
+    sign = -1 if size_bytes < 0 else 1
+    magnitude = abs(size_bytes)
+    i = min(math.floor(math.log(magnitude, 1024)), len(size_name) - 1)
     p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
+    s = round(sign * magnitude / p, 2)
     return f"{s} {size_name[i]}"
 
 

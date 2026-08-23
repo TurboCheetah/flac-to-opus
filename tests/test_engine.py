@@ -52,6 +52,35 @@ def test_encoder_nonzero_is_failure(tmp_path):
     assert result.stderr == "boom"
 
 
+def test_encoder_process_launch_oserror_is_failure(tmp_path):
+    src = tmp_path / "a.flac"
+    dest = tmp_path / "nested" / "a.opus"
+    src.write_bytes(b"f")
+
+    with patch(
+        "flac_to_opus.opusenc.subprocess.run", side_effect=OSError("missing opusenc")
+    ):
+        result = OpusencEncoder().encode(src, dest, "192")
+
+    assert result.ok is False
+    assert result.returncode == 1
+    assert result.stderr == "missing opusenc"
+    assert result.duration_s >= 0
+
+
+def test_encoder_destination_creation_oserror_is_failure(tmp_path):
+    src = tmp_path / "a.flac"
+    blocked_parent = tmp_path / "blocked"
+    dest = blocked_parent / "a.opus"
+    src.write_bytes(b"f")
+    blocked_parent.write_bytes(b"not a directory")
+
+    result = OpusencEncoder().encode(src, dest, "192")
+
+    assert result.ok is False
+    assert result.returncode == 1
+
+
 class FakeEncoder:
     def __init__(self, ok: bool = True, stderr: str = ""):
         self.calls: list[tuple[str, str, str]] = []

@@ -47,6 +47,19 @@ def test_failed_encode_exits_one(tmp_path, monkeypatch):
     assert rc == 1
 
 
+def test_nested_sidecar_copy_creates_destination_parent(tmp_path):
+    src = tmp_path / "in"
+    dest = tmp_path / "out"
+    nested = src / "artwork"
+    nested.mkdir(parents=True)
+    (nested / "cover.jpg").write_bytes(b"cover")
+
+    rc = main([str(src), str(dest)], which=lambda n: "/bin/opusenc")
+
+    assert rc == 0
+    assert (dest / "artwork" / "cover.jpg").read_bytes() == b"cover"
+
+
 def test_bad_bitrate_does_not_create_dest(tmp_path):
     src = tmp_path / "in"
     dest = tmp_path / "out"

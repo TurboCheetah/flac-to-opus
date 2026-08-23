@@ -105,6 +105,7 @@ def main(
     items = plan_items(settings)
 
     def copy_file(src: Path, dest: Path) -> None:
+        dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
 
     result = run_items(

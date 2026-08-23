@@ -29,7 +29,20 @@ def test_parse_bitrate_accepts_common_forms(raw, expected):
 
 
 @pytest.mark.parametrize(
-    "raw", ["", "k", "abc", "192kb", "0", "5", "513", "-1", "192 k"]
+    "raw",
+    [
+        "",
+        "k",
+        "abc",
+        "192kb",
+        "0",
+        "5",
+        "5.9999999999999999999999",
+        "512.000000000000000000001",
+        "513",
+        "-1",
+        "192 k",
+    ],
 )
 def test_parse_bitrate_rejects_bad_values(raw):
     with pytest.raises(ValueError):
@@ -121,6 +134,8 @@ def test_is_up_to_date_compares_mtime(tmp_path):
     assert is_up_to_date(src, dest) is False
     dest.unlink()
     assert is_up_to_date(src, dest) is False
+    dest.mkdir()
+    assert is_up_to_date(src, dest) is False
 
 
 def test_plan_items_dry_run_and_skip(tmp_path):
@@ -144,3 +159,15 @@ def test_plan_items_dry_run_and_skip(tmp_path):
     assert by_src["t.flac"].action == "skip"
     assert by_src["cover.jpg"].action == "dry-run"
     assert by_src["cover.jpg"].kind == "copy"
+
+
+def test_plan_items_gives_transcode_destination_exclusive_ownership(tmp_path):
+    settings = _settings(tmp_path)
+    (settings.source_dir / "track.flac").write_bytes(b"flac")
+    (settings.source_dir / "track.opus").write_bytes(b"old opus")
+
+    items = plan_items(settings)
+
+    assert [(item.kind, item.src.name, item.dest.name) for item in items] == [
+        ("transcode", "track.flac", "track.opus")
+    ]

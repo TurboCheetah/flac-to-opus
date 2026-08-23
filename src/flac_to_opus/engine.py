@@ -46,7 +46,6 @@ def run_items(
     items: list[PlannedItem],
     encoder: Encoder,
     copy_file: Callable[[Path, Path], None],
-    on_progress=None,
 ) -> RunResult:
     result = RunResult()
     lock = Lock()

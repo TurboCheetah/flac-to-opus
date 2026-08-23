@@ -13,14 +13,22 @@ def build_opusenc_cmd(src: Path, dest: Path, bitrate: str) -> list[str]:
 
 class OpusencEncoder:
     def encode(self, src: Path, dest: Path, bitrate: str) -> EncodeResult:
-        dest.parent.mkdir(parents=True, exist_ok=True)
         started = time.perf_counter()
-        completed = subprocess.run(
-            build_opusenc_cmd(src, dest, bitrate),
-            check=False,
-            text=True,
-            capture_output=True,
-        )
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            completed = subprocess.run(
+                build_opusenc_cmd(src, dest, bitrate),
+                check=False,
+                text=True,
+                capture_output=True,
+            )
+        except OSError as exc:
+            return EncodeResult(
+                ok=False,
+                returncode=1,
+                stderr=str(exc),
+                duration_s=time.perf_counter() - started,
+            )
         return EncodeResult(
             ok=completed.returncode == 0,
             returncode=completed.returncode,

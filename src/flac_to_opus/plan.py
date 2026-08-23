@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
 _BITRATE = re.compile(r"^(\d+(?:\.\d+)?)[kK]?$")
-_MIN_BITRATE = 6.0
-_MAX_BITRATE = 512.0
+_MIN_BITRATE = Decimal(6)
+_MAX_BITRATE = Decimal(512)
 
 
 def parse_bitrate(raw: str) -> str:
@@ -20,7 +21,7 @@ def parse_bitrate(raw: str) -> str:
     if match is None:
         raise ValueError(f"invalid bitrate {raw!r}; expected e.g. 192 or 192k")
     number = match.group(1)
-    value = float(number)
+    value = Decimal(number)
     if not (_MIN_BITRATE <= value <= _MAX_BITRATE):
         raise ValueError(
             f"bitrate {raw!r} out of range; expected {_MIN_BITRATE:g}–{_MAX_BITRATE:g} kbit/s"
@@ -66,7 +67,7 @@ def dest_for(source_dir: Path, dest_dir: Path, src: Path, kind: Kind) -> Path:
 
 
 def is_up_to_date(src: Path, dest: Path) -> bool:
-    return dest.exists() and src.stat().st_mtime <= dest.stat().st_mtime
+    return dest.is_file() and src.stat().st_mtime <= dest.stat().st_mtime
 
 
 def discover(source_dir: Path) -> tuple[list[Path], list[Path]]:
@@ -87,13 +88,17 @@ def _action(src: Path, dest: Path, dry_run: bool) -> Action:
 def plan_items(settings: Settings) -> list[PlannedItem]:
     flacs, sidecars = discover(settings.source_dir)
     items: list[PlannedItem] = []
+    transcode_destinations: set[Path] = set()
     for src in flacs:
         dest = dest_for(settings.source_dir, settings.dest_dir, src, "transcode")
+        transcode_destinations.add(dest)
         items.append(
             PlannedItem("transcode", src, dest, _action(src, dest, settings.dry_run))
         )
     for src in sidecars:
         dest = dest_for(settings.source_dir, settings.dest_dir, src, "copy")
+        if dest in transcode_destinations:
+            continue
         items.append(
             PlannedItem("copy", src, dest, _action(src, dest, settings.dry_run))
         )
