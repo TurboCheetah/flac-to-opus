@@ -43,7 +43,7 @@ fakes through the engine or patch the adapter at its seam.
 Validation happens before the destination directory and log files are created:
 source directory, bitrate, job count, and `opusenc` availability are checked in
 that order. Missing or invalid prerequisites return exit status 2. Planning and
-execution happen after validation; dry-run plans work but does not perform it.
+execution happen after validation; a dry-run plans the work but does not perform it.
 Failed encodes or copies return exit status 1, while a successful run returns
 0.
 
