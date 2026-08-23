@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: ruff + ty + pytest
+    name: lint + type + test + build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
