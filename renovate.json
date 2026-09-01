@@ -1,6 +1,34 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":enableVulnerabilityAlerts"
+  ],
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "addLabels": [
+      "security"
+    ],
+    "vulnerabilityFixStrategy": "lowest"
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "matchJsonata": [
+        "isVulnerabilityAlert = true"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true
+    }
   ]
 }
