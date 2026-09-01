@@ -1,0 +1,4 @@
+{
+  "name": "flac-to-opus",
+  "install": "sudo apt-get update && sudo apt-get install -y --no-install-recommends opus-tools flac ffmpeg && curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh && uv sync --group dev"
+}
