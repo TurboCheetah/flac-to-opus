@@ -2,29 +2,5 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>TurboCheetah/renovate-config"
-  ],
-  "packageRules": [
-    {
-      "description": "Kept from this repo's old config: no automerge except for vulnerability fixes.",
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ],
-      "automerge": false
-    },
-    {
-      "matchJsonata": [
-        "isVulnerabilityAlert = true"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ],
-      "automerge": true
-    }
   ]
 }
