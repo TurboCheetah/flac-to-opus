@@ -1,20 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
-    ":enableVulnerabilityAlerts"
+    "github>TurboCheetah/renovate-config"
   ],
-  "osvVulnerabilityAlerts": true,
-  "vulnerabilityAlerts": {
-    "addLabels": [
-      "security"
-    ],
-    "vulnerabilityFixStrategy": "lowest"
-  },
   "packageRules": [
     {
+      "description": "Kept from this repo's old config: no automerge except for vulnerability fixes.",
       "matchUpdateTypes": [
-        "major"
+        "minor",
+        "patch",
+        "pin",
+        "digest"
       ],
       "automerge": false
     },
